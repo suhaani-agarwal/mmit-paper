@@ -1,4 +1,10 @@
-source("packages.R")
+
+library(animint2)
+# library(animint)
+library(data.table)
+# library(penaltyLearning)
+library(mmit)
+
 
 data(neuroblastomaProcessed, package="penaltyLearning")
 
@@ -176,178 +182,132 @@ all.model.dt <- data.table(
   log.penalty=as.numeric(all.pred.mat+all.margin.mat))
     
 best.slack <- slack.dt[show.thresh, on=.(feature.name, threshold), nomatch=0L]
-ggplot()+
-  theme_bw()+
-  theme(panel.margin=grid::unit(0, "lines"))+
-  facet_grid(y ~ feature.name, scales="free")+
-  geom_step(aes(
-    feature, total.cost, color=cost.computation),
-    size=2,
-    data=data.table(thresh.dt, y="total.cost", cost.computation="C++"))+
-  geom_step(aes(
-    feature, slack, color=cost.computation),
-    size=1,
-    data=data.table(thresh.dt, y="total.cost", cost.computation="R"))+
-  geom_step(aes(
-    feature, cost, color=cost.computation),
-    size=2,
-    data=data.table(thresh.dt, y="below.cost", cost.computation="C++"))+
-  geom_step(aes(
-    feature, slack.below, color=cost.computation),
-    size=1,
-    data=data.table(thresh.dt, y="below.cost", cost.computation="R"))+
-  geom_step(aes(
-    feature, rev.cost, color=cost.computation),
-    size=2,
-    data=data.table(thresh.dt, y="above.cost", cost.computation="C++"))+
-  geom_step(aes(
-    feature, slack.above, color=cost.computation),
-    size=1,
-    data=data.table(thresh.dt, y="above.cost", cost.computation="R"))+
-  geom_point(aes(
-    pred.thresh, total.cost),
-    data=data.table(show.thresh, y="total.cost"),
-    shape=1,
-    color="violet")+
-  geom_point(aes(
-    feature, limit, fill=type),
-    shape=21,
-    data=data.table(target.dt, y="log(penalty)"))+
-  scale_fill_manual(values=c(min="blue", max="white"))+
-  ylab("")+
-  geom_segment(aes(
-    feature, limit,
-    xend=feature, yend=limit+sign*slack),
-    data=data.table(best.slack, y="log(penalty)"),
-    color="red")+
-  geom_segment(aes(
-    feature.min, log.penalty,
-    linetype=line,
-    xend=feature.max, yend=log.penalty),
-    data=data.table(model.dt, y="log(penalty)"),
-    size=1,
-    color="red")+
-  geom_vline(aes(
-    xintercept=pred.thresh),
-    data=show.thresh,
-    linetype="dotted",
-    color="violet")+
-  scale_linetype_manual(values=c(prediction="solid", margin="dotted"))
 
-ggplot()+
-  geom_step(aes(
-    feature, total.cost,
-    group=feature.name),
-    data=data.table(thresh.dt, y="total.cost"),
-    size=2)
+viz <- animint(
 
-viz <- list(
-  features=ggplot()+
-    theme_bw()+
-    theme(panel.margin=grid::unit(0, "lines"))+
-    theme_animint(width=1000)+
-    facet_grid(y ~ feature.name, scales="free")+
-    geom_step(aes(
-      feature, total.cost),
-      data=data.table(thresh.dt, y="total.cost"),
-      size=2)+
-    geom_tallrect(aes(
-      xmin=feature, xmax=feature+diff.feature,
-      clickSelects.variable=paste0(feature.name, ".thresh"),
-      clickSelects.value=threshold),
-      data=data.table(thresh.dt, y="total.cost"),
-      alpha=0.2,
-      size=2)+
-    geom_point(aes(
-      threshold, total.cost,
-      key=feature.name,
-      showSelected.variable=paste0(feature.name, ".thresh"),
-      showSelected.value=threshold),
-      data=data.table(thresh.dt, y="total.cost"),
-      fill=NA,
-      color="violet")+
+  title = "Penalty Learning Visualization",
+  source = "figure-penaltyLearning",
+  features = ggplot() +
+    theme_bw() +
+    theme_animint(width = 1000, height = 600) +
+    facet_grid(y ~ feature.name, scales = "free") +
+    
+    # Main cost curve
+    geom_step(
+      aes(x = feature, y = total.cost),
+      data = data.table(thresh.dt, y = "total.cost"),
+      size = 2
+    ) +
+    
+    # Interactive threshold selection
+    geom_tallrect(
+      aes(xmin = feature, xmax = feature + diff.feature),
+      # clickSelects.variable=paste0(feature.name, ".thresh"),
+      clickSelects = "threshold",
+      data = data.table(thresh.dt, y = "total.cost"),
+      alpha = 0.2, size = 2
+    ) +
+    
+    # Selected threshold indicator
+    geom_point(
+      aes(x = threshold, y = total.cost, key = feature.name, tooltip=paste0(feature.name, ".thresh")),
+      data = data.table(thresh.dt, y = "total.cost"),
+      fill = "violet",
+      color = "violet",
+      showSelected = "threshold",
+      size = 5
+    ) +
     geom_vline(aes(
-      xintercept=threshold,
-      key=feature.name,
+      xintercept = threshold,
+      key = feature.name),
+      data = thresh.dt,
+      linetype = "dotted",
+      color = "violet",
+      size = 3,
       showSelected.variable=paste0(feature.name, ".thresh"),
-      showSelected.value=threshold),
-      data=thresh.dt,
-      linetype="dotted",
-      color="violet")+
-    scale_fill_manual(values=c(min="blue", max="white"))+
-    ylab("")+
+      showSelected = "threshold") +
+    scale_fill_manual(values = c(min = "blue", max = "white")) +
+    ylab("") +
     geom_segment(aes(
-      feature, limit,
+      x = feature, y = limit,
+      key = paste(feature.name, row.i),
+      xend = feature, yend = limit + sign * slack),
+      data = data.table(slack.dt, y = "log(penalty)"),
+      color = "red",
       showSelected.variable=paste0(feature.name, ".thresh"),
-      showSelected.value=threshold,
-      key=paste(feature.name, row.i),
-      xend=feature, yend=limit+sign*slack),
-      data=data.table(slack.dt, y="log(penalty)"),
-      color="red")+
+      showSelected="threshold")+
+      # showSelected = "threshold") +
     geom_segment(aes(
-      feature.min, log.penalty,
-      linetype=line,
+      x = feature.min, y = log.penalty,
+      linetype = line,
+      key = paste(feature.name, line.side, line.sign),
+      xend = feature.max, yend = log.penalty),
+      data = data.table(all.model.dt, y = "log(penalty)"),
+      size = 1,
+      color = "red",
       showSelected.variable=paste0(feature.name, ".thresh"),
-      showSelected.value=threshold,
-      key=paste(feature.name, line.side, line.sign),
-      xend=feature.max, yend=log.penalty),
-      data=data.table(all.model.dt, y="log(penalty)"),
-      size=1,
-      color="red")+
-    scale_linetype_manual(values=c(prediction="solid", margin="dotted"))+
+      showSelected="threshold")+
+      # showSelected = "threshold") +
+    scale_linetype_manual(values = c(prediction = "solid", margin = "dotted")) +
     geom_point(aes(
-      feature, limit,
-      key=pid.chr,
-      fill=type),
-      data=data.table(target.dt, y="log(penalty)")),
-  duration=list(),
-  first=list())
-viz$duration[paste0(unique(thresh.dt$feature.name), ".thresh")] <- 2000
-best.each <- thresh.dt[, .SD[which.min(total.cost),], by=feature.name]
-viz$first[paste0(best.each$feature.name, ".thresh")] <- best.each$threshold
+      x = feature, y = limit,
+      key = pid.chr,
+      fill = type),
+      data = data.table(target.dt, y = "log(penalty)")),
+  
+  duration = list(threshold = 2000),
+  time = list(variable = "threshold", ms = 2000),
+  selector.types = list(threshold = "single")
+)
+
+# Set initial selection
+best.each <- thresh.dt[, .SD[which.min(total.cost), ], by = feature.name]
+viz$first <- list(threshold = best.each$threshold[1])
+
 animint2dir(viz, "figure-penaltyLearning")
 
-gg <- ggplot()+
-  theme_bw()+
-  theme(panel.margin=grid::unit(0, "lines"))+
-  facet_grid(y ~ feature.name, scales="free")+
-    geom_segment(aes(
-      feature, total.cost,
-      xend=feature+diff.feature, yend=total.cost),
-      data=data.table(thresh.dt, y="total.cost"),
-      size=2)+
-    geom_point(aes(
-      pred.thresh, total.cost),
-      data=data.table(show.thresh, y="total.cost"),
-      shape=1,
-      color="violet")+
-    geom_point(aes(
-      feature, limit, fill=type),
-      shape=21,
-      data=data.table(target.dt, y="log(penalty)"))+
-    scale_fill_manual(values=c(min="blue", max="white"))+
-    ylab("")+
-    geom_segment(aes(
-      feature, limit,
-      xend=feature, yend=limit+sign*slack),
-      data=data.table(best.slack, y="log(penalty)"),
-      color="red")+
-    geom_segment(aes(
-      feature.min, log.penalty,
-      linetype=line,
-      xend=feature.max, yend=log.penalty),
-      data=data.table(model.dt, y="log(penalty)"),
-      size=1,
-      color="red")+
-    geom_vline(aes(
-      xintercept=pred.thresh),
-      data=show.thresh,
-      linetype="dotted",
-      color="violet")+
-  scale_linetype_manual(values=c(prediction="solid", margin="dotted"))
-png("figure-penaltyLearning.png", 6, 6, units="in", res=100)
-print(gg)
-dev.off()
 
-## TODO: hold out half data, compute test error for different margin
-## parameters.
+# gg <- ggplot()+
+#   theme_bw()+
+#   # theme(panel.margin=grid::unit(0, "lines"))+
+#   facet_grid(y ~ feature.name, scales="free")+
+#     geom_segment(aes(
+#       feature, total.cost,
+#       xend=feature+diff.feature, yend=total.cost),
+#       data=data.table(thresh.dt, y="total.cost"),
+#       size=2)+
+#     geom_point(aes(
+#       pred.thresh, total.cost),
+#       data=data.table(show.thresh, y="total.cost"),
+#       shape=1,
+#       color="violet")+
+#     geom_point(aes(
+#       feature, limit, fill=type),
+#       shape=21,
+#       data=data.table(target.dt, y="log(penalty)"))+
+#     scale_fill_manual(values=c(min="blue", max="white"))+
+#     ylab("")+
+#     geom_segment(aes(
+#       feature, limit,
+#       xend=feature, yend=limit+sign*slack),
+#       data=data.table(best.slack, y="log(penalty)"),
+#       color="red")+
+#     geom_segment(aes(
+#       feature.min, log.penalty,
+#       linetype=line,
+#       xend=feature.max, yend=log.penalty),
+#       data=data.table(model.dt, y="log(penalty)"),
+#       size=1,
+#       color="red")+
+#     geom_vline(aes(
+#       xintercept=pred.thresh),
+#       data=show.thresh,
+#       linetype="dotted",
+#       color="violet")+
+#   scale_linetype_manual(values=c(prediction="solid", margin="dotted"))
+# png("figure-penaltyLearning.png", 6, 6, units="in", res=100)
+# print(gg)
+# dev.off()
+
+# ## TODO: hold out half data, compute test error for different margin
+# ## parameters.
